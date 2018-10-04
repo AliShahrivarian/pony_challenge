@@ -59,21 +59,29 @@ class DomokunMaze {
         if (!this.playedCellsStatus[this.mazeState.pony[0]]) {
             let directions = [['stay', this.mazeState.pony[0]]]
             let openSides = 0
+            let isDeadEnd = (cellId) => {
+                return this.playedCellsStatus[cellId] &&
+                    this.playedCellsStatus[cellId]['isDeadEnd'];
+            }
             if (this.mazeState.pony[0] - this.width > -1 && this.mazeState.data[this.mazeState.pony[0]].indexOf('north') == -1) {
                 directions.push(['north', this.mazeState.pony[0] - this.width]);
-                openSides++;
+                if (!isDeadEnd(this.mazeState.pony[0] - this.width))
+                    openSides++;
             }
             if (this.mazeState.pony[0] - 1 > -1 && this.mazeState.data[this.mazeState.pony[0]].indexOf('west') == -1) {
                 directions.push(['west', this.mazeState.pony[0] - 1]);
-                openSides++;
+                if (!isDeadEnd(this.mazeState.pony[0] - 1))
+                    openSides++;
             }
             if ((this.mazeState.pony[0] + 1) % (this.width - 1) < this.width && this.mazeState.data[this.mazeState.pony[0] + 1].indexOf('west') == -1) {
                 directions.push(['east', this.mazeState.pony[0] + 1]);
-                openSides++;
+                if (!isDeadEnd(this.mazeState.pony[0] + 1))
+                    openSides++;
             }
             if ((this.mazeState.pony[0] + this.width) < (this.width * this.height) && this.mazeState.data[this.mazeState.pony[0] + this.width].indexOf('north') == -1) {
                 directions.push(['south', this.mazeState.pony[0] + this.width]);
-                openSides++;
+                if (!isDeadEnd(this.mazeState.pony[0] + this.width))
+                    openSides++;
             }
             this.playedCellsStatus[this.mazeState.pony[0]] = {
                 'isDeadEnd': openSides === 1,
@@ -151,6 +159,10 @@ class DomokunMaze {
                 }),
                 contentType: 'application/json',
                 success: (result) => {
+                    if (result['state'] == 'won') {
+                        alert('Pony wons!');
+                        return;
+                    }
                     if (result['state-result'] == 'Move accepted') {
                         this.getMazeState()
                     }
