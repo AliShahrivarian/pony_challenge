@@ -56,41 +56,46 @@ class DomokunMaze {
             });
     }
     calcAvailableDirections() {
-        if (!this.playedCellsStatus[this.mazeState.pony[0]]) {
-            let directions = [['stay', this.mazeState.pony[0]]]
-            let openSides = 0
-            let isDeadEnd = (cellId) => {
-                return this.playedCellsStatus[cellId] &&
-                    this.playedCellsStatus[cellId]['isDeadEnd'];
-            }
-            if (this.mazeState.pony[0] - this.width > -1 && this.mazeState.data[this.mazeState.pony[0]].indexOf('north') == -1) {
-                directions.push(['north', this.mazeState.pony[0] - this.width]);
-                if (!isDeadEnd(this.mazeState.pony[0] - this.width))
-                    openSides++;
-            }
-            if (this.mazeState.pony[0] - 1 > -1 && this.mazeState.data[this.mazeState.pony[0]].indexOf('west') == -1) {
-                directions.push(['west', this.mazeState.pony[0] - 1]);
-                if (!isDeadEnd(this.mazeState.pony[0] - 1))
-                    openSides++;
-            }
-            if ((this.mazeState.pony[0] + 1) % (this.width - 1) < this.width && this.mazeState.data[this.mazeState.pony[0] + 1].indexOf('west') == -1) {
-                directions.push(['east', this.mazeState.pony[0] + 1]);
-                if (!isDeadEnd(this.mazeState.pony[0] + 1))
-                    openSides++;
-            }
-            if ((this.mazeState.pony[0] + this.width) < (this.width * this.height) && this.mazeState.data[this.mazeState.pony[0] + this.width].indexOf('north') == -1) {
-                directions.push(['south', this.mazeState.pony[0] + this.width]);
-                if (!isDeadEnd(this.mazeState.pony[0] + this.width))
-                    openSides++;
-            }
-            this.playedCellsStatus[this.mazeState.pony[0]] = {
-                'isDeadEnd': openSides === 1,
-                'visited': true,
-                'availableDirections': directions
-            }
-        } else {
-            this.playedCellsStatus[this.mazeState.pony[0]]['isDeadEnd'] = false;
+        let directions = []
+        let openSides = 0
+        let newCellId = this.mazeState.pony[0] - this.width;
+        let isDeadEnd;
+        if (newCellId > -1 &&
+            this.mazeState.data[this.mazeState.pony[0]].indexOf('north') == -1) {
+            isDeadEnd = this.isDeadEnd(newCellId);
+            directions.push(['north', newCellId, isDeadEnd, this.isVisited(newCellId), this.isDokumonThere(newCellId)]);
+            if (!isDeadEnd)
+                openSides++;
         }
+        newCellId = this.mazeState.pony[0] - 1;
+        if (newCellId > -1 &&
+            this.mazeState.data[this.mazeState.pony[0]].indexOf('west') == -1) {
+            isDeadEnd = this.isDeadEnd(newCellId);
+            directions.push(['west', newCellId, isDeadEnd, this.isVisited(newCellId), this.isDokumonThere(newCellId)]);
+            if (!isDeadEnd)
+                openSides++;
+        }
+        newCellId = this.mazeState.pony[0] + 1;
+        if ((newCellId) % (this.width - 1) < this.width &&
+            this.mazeState.data[newCellId].indexOf('west') == -1) {
+            isDeadEnd = this.isDeadEnd(newCellId);
+            directions.push(['east', newCellId, isDeadEnd, this.isVisited(newCellId), this.isDokumonThere(newCellId)]);
+            if (!isDeadEnd)
+                openSides++;
+        }
+        newCellId = this.mazeState.pony[0] + this.width;
+        if ((newCellId) < (this.width * this.height) &&
+            this.mazeState.data[newCellId].indexOf('north') == -1) {
+            isDeadEnd = this.isDeadEnd(newCellId);
+            directions.push(['south', newCellId, isDeadEnd, this.isVisited(newCellId), this.isDokumonThere(newCellId)]);
+            if (!isDeadEnd)
+                openSides++;
+        }
+        this.playedCellsStatus[this.mazeState.pony[0]] = {
+            'isDeadEnd': openSides === 1,
+            'visited': true,
+            'availableDirections': directions
+        };
     }
     bindDirectionKeys() {
         if (this.isChanginPosition) {
@@ -119,33 +124,53 @@ class DomokunMaze {
         // TODO: get all directions
         // TODO: iter directions
         // TODO: check if direction is visited or is deadEnd or is domokun there
-        let directions = this.playedCellsStatus[this.mazeState.pony[0]]['availableDirections'].slice(1)
-        let direction;
-        let safeDirections = [];
-        while (directions.length) {
-            direction = directions.pop();
-            let cellId = direction[1];
-            if (this.playedCellsStatus[this.mazeState.pony[0]]['availableDirections'].length < 4 &&
-                this.playedCellsStatus[cellId] && this.playedCellsStatus[cellId]['isDeadEnd']) {
-                this.playedCellsStatus[this.mazeState.pony[0]]['isDeadEnd'] = true;
-            }
-            if (this.isCellRightChoice(cellId)) {
-                safeDirections.push(direction)
-                if (this.playedCellsStatus[cellId] == undefined ||
-                    !this.playedCellsStatus[cellId]['visited'] ||
-                    !directions.length) {
-                    if (this.playedCellsStatus[cellId] && this.playedCellsStatus[cellId]['isDeadEnd'])
-                        continue;
-                    this.changeCell(direction[0]);
-                    return;
-                }
-            }
-            else if (this.playedCellsStatus[this.mazeState.pony[0]]['availableDirections'].length == 2) {
-                this.changeCell('stay');
-            }
+        let directions = this.playedCellsStatus[this.mazeState.pony[0]]['availableDirections'].slice()
+            .filter((item) => { return !item.slice(-1)[0] })
+        if (directions.length == 0) {
+            this.changeCell('stay');
+            return;
+        } let endPoint = directions.filter((item) => { return item[1] == this.mazeState['end-point'][0] });
+        if (endPoint.length) {
+            this.changeCell(endPoint[0][0]);
+            return;
         }
-        if (safeDirections.length)
-            this.changeCell(safeDirections[0][0]);
+        let unvisited = directions.filter((item) => { return !item[3] });
+        if (unvisited.length) {
+            this.changeCell(unvisited[0][0]);
+            return;
+        }
+        let notDeadEnds = directions.filter((item) => { return !item[2] });
+        if (notDeadEnds.length) {
+            this.changeCell(notDeadEnds[0][0]);
+            return;
+        }
+        this.changeCell(directions[0][0]);
+        // let direction;
+        // let safeDirections = [];
+        // while (directions.length) {
+        //     direction = directions.pop();
+        //     let cellId = direction[1];
+        //     if (this.playedCellsStatus[this.mazeState.pony[0]]['availableDirections'].length < 4 &&
+        //         this.playedCellsStatus[cellId] && this.playedCellsStatus[cellId]['isDeadEnd']) {
+        //         this.playedCellsStatus[this.mazeState.pony[0]]['isDeadEnd'] = true;
+        //     }
+        //     if (this.isDokumonThere(cellId)) {
+        //         safeDirections.push(direction)
+        //         if (this.playedCellsStatus[cellId] == undefined ||
+        //             !this.playedCellsStatus[cellId]['visited'] ||
+        //             !directions.length) {
+        //             if (this.playedCellsStatus[cellId] && this.playedCellsStatus[cellId]['isDeadEnd'])
+        //                 continue;
+        //             this.changeCell(direction[0]);
+        //             return;
+        //         }
+        //     }
+        //     else if (this.playedCellsStatus[this.mazeState.pony[0]]['availableDirections'].length == 2) {
+        //         this.changeCell('stay');
+        //     }
+        // }
+        // if (safeDirections.length)
+        //     this.changeCell(safeDirections[0][0]);
     }
     changeCell(direction) {
         if (this.playedCellsStatus[this.mazeState.pony[0]]['availableDirections']
@@ -161,9 +186,10 @@ class DomokunMaze {
                 success: (result) => {
                     if (result['state'] == 'won') {
                         alert('Pony wons!');
-                        return;
+                    }else if(result['state'] == 'over'){
+                        alert('Game Over!');
                     }
-                    if (result['state-result'] == 'Move accepted') {
+                    else if (result['state-result'] == 'Move accepted') {
                         this.getMazeState()
                     }
                 }
@@ -188,10 +214,22 @@ class DomokunMaze {
         }
         return cellId;
     }
-    isCellRightChoice(cellId) {
+    isVisited(cellId) {
+        if (this.playedCellsStatus[cellId] &&
+            this.playedCellsStatus[cellId]['visited'])
+            return true;
+        return false;
+    }
+    isDeadEnd(cellId) {
+        if (this.playedCellsStatus[cellId] &&
+            this.playedCellsStatus[cellId]['isDeadEnd'])
+            return true;
+        return false;
+    }
+    isDokumonThere(cellId) {
         if (cellId == this.mazeState.domokun[0]) {
-            return false;
+            return true;
         }
-        return true;
+        return false;
     }
 }
