@@ -1,23 +1,20 @@
 
-class DomokunMaze {
-    constructor(width, height, ponyName, difficulty, is_human_player) {
+class DomokunMaze_v2 {
+    constructor(width, height, ponyName, difficulty) {
         this.width = width;
         this.height = height;
         this.ponyName = ponyName;
         this.difficulty = difficulty;
-        this.is_human_player = is_human_player;
         this.playerMovesDetail = {};
         this.playedCellsStatus = {};
         this.isChanginPosition = false;
+        this.escapeRoutes = [];
     }
     get apiBaseUrl() {
         return 'https://ponychallenge.trustpilot.com/pony-challenge/maze';
     }
     startGame() {
         this.initNewMaze();
-        if (this.is_human_player) {
-            this.bindDirectionKeys();
-        }
     }
     initNewMaze() {
         $.ajax({
@@ -37,22 +34,26 @@ class DomokunMaze {
         });
     }
     getMazeState() {
-        $.when($.ajax({
-            type: 'GET',
-            url: this.apiBaseUrl + '/' + this.mazeId
-        }),
-            $.ajax({
-                type: 'GET',
-                url: this.apiBaseUrl + '/' + this.mazeId + '/print'
-            })).done((res1, res2) => {
+        $.when(this.getMazeStateAjax(),this.getMazePrintAjax()).done((res1, res2) => {
                 $('.mazeBoard > pre > code').text(res2[0]);
                 this.mazeState = res1[0];
-                if (!this.is_human_player) {
-                    this.playAI()
-                }
-                $('.mazeBoard > pre > code').text(res2[0]);
+                if(this.escapeRoutes.length === 0)
+                    this.getRouteToEscape(this.mazeState.pony[0]);
+                this.playAI()
                 this.isChanginPosition = false;
             });
+    }
+    getMazeStateAjax(){
+        return $.ajax({
+            type: 'GET',
+            url: this.apiBaseUrl + '/' + this.mazeId
+        });
+    }
+    getMazePrintAjax(){
+        return $.ajax({
+            type: 'GET',
+            url: this.apiBaseUrl + '/' + this.mazeId + '/print'
+        });
     }
     calcAvailableDirections(cellId) {
         let directions = []
@@ -75,7 +76,7 @@ class DomokunMaze {
                 openSides++;
         }
         newCellId = cellId + 1;
-        if ((newCellId) % (this.width - 1) < this.width && newCellId < (this.width * this.height)  &&
+        if ((newCellId) % (this.width - 1) < this.width && newCellId < (this.width * this.height) &&
             this.mazeState.data[newCellId].indexOf('west') == -1) {
             isDeadEnd = this.isDeadEnd(newCellId);
             directions.push(['east', newCellId, isDeadEnd, this.isVisited(newCellId), this.isDokumonThere(newCellId)]);
@@ -83,7 +84,7 @@ class DomokunMaze {
                 openSides++;
         }
         newCellId = cellId + this.width;
-        if ((newCellId) < (this.width * this.height) &&
+        if (newCellId < (this.width * this.height) &&
             this.mazeState.data[newCellId].indexOf('north') == -1) {
             isDeadEnd = this.isDeadEnd(newCellId);
             directions.push(['south', newCellId, isDeadEnd, this.isVisited(newCellId), this.isDokumonThere(newCellId)]);
@@ -96,58 +97,11 @@ class DomokunMaze {
             'availableDirections': directions
         };
     }
-    bindDirectionKeys() {
-        if (this.isChanginPosition) {
-            return;
-        }
-        $(document).keydown((e) => {
-            switch (e.which) {
-                case 37: // left
-                    this.changeCell('west');
-                    break;
-                case 38: // up
-                    this.changeCell('north');
-                    break;
-                case 39: // right
-                    this.changeCell('east');
-                    break;
-                case 40: // down
-                    this.changeCell('south');
-                    break;
-                default: return; // exit this handler for other keys
-            }
-            e.preventDefault(); // prevent the default action (scroll / move caret)
-        });
-    }
     playAI() {
-        // TODO: get all directions
-        // TODO: iter directions
-        // TODO: check if direction is visited or is deadEnd or is domokun there
-        this.calcAvailableDirections(this.mazeState.pony[0]);
-        let directions = this.playedCellsStatus[this.mazeState.pony[0]]['availableDirections'].slice()
-            .filter((item) => { return !item.slice(-1)[0] })
-        if (directions.length == 0) {
-            this.changeCell('stay');
-            return;
-        } let endPoint = directions.filter((item) => { return item[1] == this.mazeState['end-point'][0] });
-        if (endPoint.length) {
-            this.changeCell(endPoint[0][0]);
-            return;
-        }
-        let unvisited = directions.filter((item) => { return !item[3] });
-        if (unvisited.length) {
-            this.changeCell(unvisited[0][0]);
-            return;
-        }
-        let notDeadEnds = directions.filter((item) => { return !item[2] });
-        if (notDeadEnds.length) {
-            this.changeCell(notDeadEnds[0][0]);
-            return;
-        }
-        this.changeCell(directions[0][0]);
+        this.changeCell(this.escapeRoutes.shift().split('-')[1]);
     }
     changeCell(direction) {
-        if (this.is_human_player || this.playedCellsStatus[this.mazeState.pony[0]]['availableDirections']
+        if (this.playedCellsStatus[this.mazeState.pony[0]]['availableDirections']
             .filter((item) => item[0] === direction).length > 0) {
             this.isChanginPosition = true;
             $.ajax({
@@ -160,7 +114,7 @@ class DomokunMaze {
                 success: (result) => {
                     if (result['state'] == 'won') {
                         alert('Pony wons!');
-                    }else if(result['state'] == 'over'){
+                    } else if (result['state'] == 'over') {
                         alert('Game Over!');
                     }
                     else if (result['state-result'] == 'Move accepted') {
@@ -205,5 +159,37 @@ class DomokunMaze {
             return true;
         }
         return false;
+    }
+
+    getRouteToEscape(fromCellId) {
+        this.escapeRoutes = this.findRoutesToEscape(fromCellId, -1).split(',').slice(0,-1);
+    }
+    findRoutesToEscape(fromCellId, previousCellId) {
+        if (fromCellId === this.mazeState['end-point'][0])
+            return fromCellId+',endPoint';
+
+        this.calcAvailableDirections(fromCellId);
+        let paths = [];
+        for (let i = 0; i < this.playedCellsStatus[fromCellId]['availableDirections'].length; i++) {
+            if (this.playedCellsStatus[fromCellId]['availableDirections'][i][1] === previousCellId)
+                continue;
+            paths.push(fromCellId +
+                '-'+this.playedCellsStatus[fromCellId]['availableDirections'][i][0]+',' +
+                this.findRoutesToEscape(
+                    this.playedCellsStatus[fromCellId]['availableDirections'][i][1],
+                    fromCellId)
+            );
+        }
+        if (paths.length == 0)
+            return fromCellId+',deadEnd';
+        let result = paths.filter((path) => { return path.indexOf('endPoint') > -1 });
+        if (result.length)
+            {
+                console.log(result);
+                return result[0];}
+        result = paths.filter((path) => { return path.indexOf('deadEnd') === -1 });
+        if (result.length)
+            return result[0];
+        return paths[0]
     }
 }
