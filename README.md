@@ -18,4 +18,5 @@ Time: about 2 hours
 - Added buttons for choosing which AI has to play.
 
 ## TO DO
-In searching path mode, Pony has to avoid Domokun, save return path and return to game after fleeing.
+- In searching path mode, Pony has to avoid Domokun, save return path and return to game after fleeing.
+- Make UI look better.
