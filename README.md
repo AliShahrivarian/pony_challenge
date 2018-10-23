@@ -1,4 +1,4 @@
-# pony_challenge_trust_pilot
+# pony_challenge
 Just a project to save the pony for TrustPilot :)
 
 It's in first phase but works for now.
